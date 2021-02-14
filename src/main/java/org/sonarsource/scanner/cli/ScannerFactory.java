@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -32,8 +32,15 @@ class ScannerFactory {
     this.logger = logger;
   }
 
-  EmbeddedScanner create(Properties props) {
-    return EmbeddedScanner.create("ScannerCli", ScannerVersion.version(), new DefaultLogOutput())
+  EmbeddedScanner create(Properties props, String isInvokedFrom) {
+    String appName = "ScannerCLI";
+    String appVersion = ScannerVersion.version();
+    if (!isInvokedFrom.equals("") && isInvokedFrom.contains("/")) {
+      appName = isInvokedFrom.split("/")[0];
+      appVersion = isInvokedFrom.split("/")[1];
+    }
+
+    return EmbeddedScanner.create(appName, appVersion, new DefaultLogOutput())
       .addGlobalProperties((Map) props);
   }
 

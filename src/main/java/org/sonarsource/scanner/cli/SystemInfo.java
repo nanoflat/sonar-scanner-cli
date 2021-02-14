@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -30,7 +30,7 @@ class SystemInfo {
   }
 
   static void print(Logs logger) {
-    logger.info("SonarQube Scanner " + ScannerVersion.version());
+    logger.info("SonarScanner " + ScannerVersion.version());
     logger.info(java());
     logger.info(os());
     String scannerOpts = system.getenv("SONAR_SCANNER_OPTS");

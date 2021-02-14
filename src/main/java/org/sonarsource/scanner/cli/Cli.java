@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -29,6 +29,7 @@ class Cli {
   private boolean debugEnabled = false;
   private boolean displayVersionOnly = false;
   private boolean embedded = false;
+  private String invokedFrom = "";
   private final Properties props = new Properties();
   private final Exit exit;
   private final Logs logger;
@@ -48,6 +49,10 @@ class Cli {
 
   boolean isEmbedded() {
     return embedded;
+  }
+
+  String getInvokedFrom() {
+    return invokedFrom;
   }
 
   Properties properties() {
@@ -79,7 +84,8 @@ class Cli {
       displayVersionOnly = true;
 
     } else if (asList("-e", "--errors").contains(arg)) {
-      logger.info("Option -e/--errors is no longer supported and will be ignored");
+      logger
+        .info("Option -e/--errors is no longer supported and will be ignored");
 
     } else if (asList("-X", "--debug").contains(arg)) {
       props.setProperty("sonar.verbose", "true");
@@ -90,7 +96,15 @@ class Cli {
       return processProp(args, pos);
 
     } else if ("--embedded".equals(arg)) {
+      logger.info(
+        "Option --embedded is deprecated and will be removed in a future release.");
       embedded = true;
+
+    } else if (arg.startsWith("--from")) {
+      embedded = true;
+      if (arg.length() > "--from=".length()) {
+        invokedFrom = arg.substring("--from=".length());
+      }
 
     } else if (arg.startsWith("-D")) {
       arg = arg.substring(2);
@@ -118,7 +132,7 @@ class Cli {
     displayVersionOnly = false;
   }
 
-  private static void appendPropertyTo(String arg, Properties props) {
+  private void appendPropertyTo(String arg, Properties props) {
     final String key;
     final String value;
     int j = arg.indexOf('=');
@@ -129,7 +143,11 @@ class Cli {
       key = arg.substring(0, j);
       value = arg.substring(j + 1);
     }
-    props.setProperty(key, value);
+    Object oldValue = props.setProperty(key, value);
+    if (oldValue != null) {
+      logger.warn("Property '" + key + "' with value '" + oldValue + "' is "
+        + "overridden with value '" + value + "'");
+    }
   }
 
   private void printErrorAndExit(String message) {

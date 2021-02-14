@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -31,8 +31,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 public class SystemInfoTest {
-  private System2 mockSystem = mock(System2.class);
-  private Logs logs = mock(Logs.class);
+  private final System2 mockSystem = mock(System2.class);
+  private final Logs logs = mock(Logs.class);
 
   @Before
   public void setUp() {
@@ -82,8 +82,8 @@ public class SystemInfoTest {
     verify(mockSystem).getProperty("os.version");
     verify(mockSystem).getenv("SONAR_SCANNER_OPTS");
 
-    verify(logs, never()).info("SonarQube Scanner null");
-    verify(logs).info("SonarQube Scanner " + ScannerVersion.version());
+    verify(logs, never()).info("SonarScanner null");
+    verify(logs).info("SonarScanner " + ScannerVersion.version());
     verify(logs).info("Java 1.9 oracle (64-bit)");
     verify(logs).info("linux 2.5 x64");
     verify(logs).info("SONAR_SCANNER_OPTS=arg");

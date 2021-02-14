@@ -1,6 +1,6 @@
 /*
- * SonarSource :: IT :: SonarQube Scanner
- * Copyright (C) 2009-2019 SonarSource SA
+ * SonarSource :: IT :: SonarScanner CLI
+ * Copyright (C) 2009-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -27,13 +27,21 @@ import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
 
 @RunWith(Suite.class)
-@SuiteClasses({ScannerTest.class, MultimoduleTest.class, DistributionTest.class})
+@SuiteClasses({ScannerTest.class, MultimoduleTest.class,
+                DistributionTest.class})
 public class SonarScannerTestSuite {
 
   @ClassRule
-  public static final Orchestrator ORCHESTRATOR = Orchestrator.builderEnv()
-    .setSonarVersion(System.getProperty("sonar.runtimeVersion", "LATEST_RELEASE[6.7]"))
-    .addPlugin(MavenLocation.of("org.sonarsource.javascript", "sonar-javascript-plugin", "LATEST_RELEASE"))
-    .build();
+  public static final Orchestrator ORCHESTRATOR = createOrchestrator();
+
+  private static Orchestrator createOrchestrator() {
+    String sonarVersion = System
+      .getProperty("sonar.runtimeVersion", "LATEST_RELEASE[7.9]");
+    return Orchestrator.builderEnv()
+      .setSonarVersion(
+        sonarVersion).addPlugin(MavenLocation
+        .of("org.sonarsource.sonarqube", "sonar-xoo-plugin",
+          sonarVersion)).build();
+  }
 
 }

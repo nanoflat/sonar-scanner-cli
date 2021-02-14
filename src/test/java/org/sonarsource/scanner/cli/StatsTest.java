@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -28,9 +28,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 public class StatsTest {
-  private PrintStream stdOut = mock(PrintStream.class);
-  private PrintStream stdErr = mock(PrintStream.class);
-  private Logs logs = new Logs(stdOut, stdErr);
+  private final PrintStream stdOut = mock(PrintStream.class);
+  private final PrintStream stdErr = mock(PrintStream.class);
+  private final Logs logs = new Logs(stdOut, stdErr);
 
   @Test
   public void shouldPrintStats() {

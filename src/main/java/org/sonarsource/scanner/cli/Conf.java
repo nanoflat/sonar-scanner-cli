@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -28,11 +28,10 @@ import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-
 import javax.annotation.Nullable;
-
 import org.sonarsource.scanner.api.Utils;
 
 class Conf {
@@ -44,6 +43,7 @@ class Conf {
   private static final String PROPERTY_PROJECT_BASEDIR = "sonar.projectBaseDir";
   private static final String PROPERTY_PROJECT_CONFIG_FILE = "sonar.projectConfigFile";
   private static final String SONAR_PROJECT_PROPERTIES_FILENAME = "sonar-project.properties";
+  private static final String PROPERTY_SONAR_HOST_URL = "sonar.host.url";
 
   private final Cli cli;
   private final Logs logger;
@@ -63,11 +63,20 @@ class Conf {
     result.putAll(loadEnvironmentProperties());
     result.putAll(cli.properties());
     result = resolve(result);
-    
+
     // root project base directory must be present and be absolute
     result.setProperty(PROPERTY_PROJECT_BASEDIR, getRootProjectBaseDir(result).toString());
     result.remove(PROJECT_HOME);
     return result;
+  }
+
+  boolean isSonarCloud(@Nullable Properties testProperties) {
+    String hostUrl = testProperties != null ? testProperties.getProperty(PROPERTY_SONAR_HOST_URL) : properties().getProperty(PROPERTY_SONAR_HOST_URL);
+    if (hostUrl != null) {
+      return hostUrl.toLowerCase(Locale.getDefault()).contains("sonarcloud");
+    }
+
+    return false;
   }
 
   private Properties resolve(Properties props) {
@@ -80,7 +89,13 @@ class Conf {
   }
 
   private Properties loadGlobalProperties() {
-    Path settingsFile = locatePropertiesFile(cli.properties(), SCANNER_HOME, "conf/sonar-scanner.properties",
+    Properties knownPropsAtThatPoint = new Properties();
+
+    knownPropsAtThatPoint.putAll(System.getProperties());
+    knownPropsAtThatPoint.putAll(loadEnvironmentProperties());
+    knownPropsAtThatPoint.putAll(cli.properties());
+
+    Path settingsFile = locatePropertiesFile(knownPropsAtThatPoint, SCANNER_HOME, "conf/sonar-scanner.properties",
       SCANNER_SETTINGS);
     if (settingsFile != null && Files.isRegularFile(settingsFile)) {
       logger.info("Scanner configuration file: " + settingsFile);
@@ -92,13 +107,14 @@ class Conf {
 
   private Properties loadProjectProperties() {
     Properties rootProps = new Properties();
-    Properties knownProps = new Properties();
+    Properties knownPropsAtThatPoint = new Properties();
 
-    knownProps.putAll(System.getProperties());
-    knownProps.putAll(cli.properties());
+    knownPropsAtThatPoint.putAll(System.getProperties());
+    knownPropsAtThatPoint.putAll(loadEnvironmentProperties());
+    knownPropsAtThatPoint.putAll(cli.properties());
 
-    Path defaultRootSettingsFile = getRootProjectBaseDir(knownProps).resolve(SONAR_PROJECT_PROPERTIES_FILENAME);
-    Path rootSettingsFile = locatePropertiesFile(defaultRootSettingsFile, knownProps, PROJECT_SETTINGS);
+    Path defaultRootSettingsFile = getRootProjectBaseDir(knownPropsAtThatPoint).resolve(SONAR_PROJECT_PROPERTIES_FILENAME);
+    Path rootSettingsFile = locatePropertiesFile(defaultRootSettingsFile, knownPropsAtThatPoint, PROJECT_SETTINGS);
     if (rootSettingsFile != null && Files.isRegularFile(rootSettingsFile)) {
       logger.info("Project root configuration file: " + rootSettingsFile);
       rootProps.putAll(toProperties(rootSettingsFile));
@@ -112,7 +128,7 @@ class Conf {
     // root config file
     projectProps.putAll(rootProps);
 
-    rootProps.putAll(knownProps);
+    rootProps.putAll(knownPropsAtThatPoint);
     rootProps.setProperty(PROPERTY_PROJECT_BASEDIR, getRootProjectBaseDir(rootProps).toString());
 
     // projectProps will be overridden by any properties found in child
@@ -204,8 +220,7 @@ class Conf {
     return moduleProps;
   }
 
-  private static Path locatePropertiesFile(Properties props, String homeKey, String relativePathFromHome,
-    String settingsKey) {
+  private static Path locatePropertiesFile(Properties props, String homeKey, String relativePathFromHome, String settingsKey) {
     Path settingsFile = null;
     String scannerHome = props.getProperty(homeKey, "");
     if (!"".equals(scannerHome)) {
@@ -216,12 +231,12 @@ class Conf {
   }
 
   private static Path locatePropertiesFile(@Nullable Path defaultPath, Properties props, String settingsKey) {
-    Path settingsFile = defaultPath;
-    if (settingsFile == null || !Files.exists(settingsFile)) {
-      String settingsPath = props.getProperty(settingsKey, "");
-      if (!"".equals(settingsPath)) {
-        settingsFile = Paths.get(settingsPath);
-      }
+    Path settingsFile;
+    String settingsPath = props.getProperty(settingsKey, "");
+    if (!"".equals(settingsPath)) {
+      settingsFile = Paths.get(settingsPath);
+    } else {
+      settingsFile = defaultPath;
     }
 
     if (settingsFile != null) {

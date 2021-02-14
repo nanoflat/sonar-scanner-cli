@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -45,6 +45,14 @@ public class CliTest {
     assertThat(cli.properties().get("foo")).isEqualTo("bar");
     assertThat(cli.properties().get("hello")).isEqualTo("world");
     assertThat(cli.properties().get("boolean")).isEqualTo("true");
+  }
+
+  @Test
+  public void should_warn_on_duplicate_properties() {
+    logs = mock(Logs.class);
+    cli = new Cli(exit, logs);
+    cli.parse(new String[] {"-D", "foo=bar", "--define", "foo=baz"});
+    verify(logs).warn("Property 'foo' with value 'bar' is overridden with value 'baz'");
   }
 
   @Test
@@ -108,6 +116,19 @@ public class CliTest {
     cli.parse(new String[] {"--errors"});
     assertThat(cli.isDebugEnabled()).isFalse();
     assertThat(cli.properties().get("sonar.verbose")).isNull();
+  }
+
+  @Test
+  public void should_parse_from_argument() {
+    cli.parse(new String[] {"--from=ScannerMSBuild/4.8"});
+    assertThat(cli.getInvokedFrom()).isNotEmpty();
+    assertThat(cli.getInvokedFrom()).isEqualTo("ScannerMSBuild/4.8");
+  }
+
+  @Test
+  public void from_argument_is_only_from_let_value_empty() {
+    cli.parse(new String[] {"--from="});
+    assertThat(cli.getInvokedFrom()).isEmpty();
   }
 
   @Test

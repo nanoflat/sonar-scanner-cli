@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -34,6 +34,7 @@ import org.sonarsource.scanner.api.ScanProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -61,17 +62,18 @@ public class MainTest {
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    when(scannerFactory.create(any(Properties.class))).thenReturn(scanner);
+    when(scannerFactory.create(any(Properties.class), any(String.class))).thenReturn(scanner);
     when(conf.properties()).thenReturn(properties);
   }
 
   @Test
   public void should_execute_runner() {
+    when(cli.getInvokedFrom()).thenReturn("");
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
     main.execute();
 
     verify(exit).exit(Exit.SUCCESS);
-    verify(scannerFactory).create(properties);
+    verify(scannerFactory).create(properties, "");
 
     verify(scanner, times(1)).start();
     verify(scanner, times(1)).execute((Map) properties);
@@ -83,13 +85,14 @@ public class MainTest {
     Exception e = new NullPointerException("NPE");
     e = new IllegalStateException("Error", e);
     doThrow(e).when(runner).execute(any());
-    when(scannerFactory.create(any(Properties.class))).thenReturn(runner);
+    when(cli.getInvokedFrom()).thenReturn("");
+    when(scannerFactory.create(any(Properties.class), any(String.class))).thenReturn(runner);
     when(cli.isDebugEnabled()).thenReturn(true);
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
     main.execute();
 
     verify(exit).exit(Exit.INTERNAL_ERROR);
-    verify(logs).error("Error during SonarQube Scanner execution", e);
+    verify(logs).error("Error during SonarScanner execution", e);
   }
 
   @Test
@@ -98,8 +101,9 @@ public class MainTest {
     Exception e = new NullPointerException("NPE");
     e = new IllegalStateException("Error", e);
     doThrow(e).when(runner).start();
+    when(cli.getInvokedFrom()).thenReturn("");
     when(cli.isDebugEnabled()).thenReturn(true);
-    when(scannerFactory.create(any(Properties.class))).thenReturn(runner);
+    when(scannerFactory.create(any(Properties.class), any(String.class))).thenReturn(runner);
 
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
     main.execute();
@@ -107,64 +111,79 @@ public class MainTest {
     verify(runner).start();
     verify(runner, never()).execute(any());
     verify(exit).exit(Exit.INTERNAL_ERROR);
-    verify(logs).error("Error during SonarQube Scanner execution", e);
+    verify(logs).error("Error during SonarScanner execution", e);
   }
 
   @Test
-  public void show_error_MessageException() {
+  public void show_stacktrace() {
+    Exception e = createException(false);
+    testException(e, false, false, Exit.INTERNAL_ERROR);
+
+    verify(logs).error("Error during SonarScanner execution", e);
+    verify(logs).error("Re-run SonarScanner using the -X switch to enable full debug logging.");
+  }
+
+  @Test
+  public void dont_show_MessageException_stacktrace() {
     Exception e = createException(true);
     testException(e, false, false, Exit.USER_ERROR);
 
-    verify(logs).error("Error during SonarQube Scanner execution");
-    verify(logs).error("Caused by: NPE");
-    verify(logs).error("Re-run SonarQube Scanner using the -X switch to enable full debug logging.");
+    verify(logs, times(5)).error(anyString());
+    verify(logs).error("Error during SonarScanner execution");
+    verify(logs).error("my message");
+    verify(logs).error("Caused by: A functional cause");
+    verify(logs).error("");
+    verify(logs).error("Re-run SonarScanner using the -X switch to enable full debug logging.");
   }
 
   @Test
-  public void show_error_MessageException_embedded() {
+  public void dont_show_MessageException_stacktrace_embedded() {
     Exception e = createException(true);
     testException(e, false, true, Exit.USER_ERROR);
 
-    verify(logs).error("Error during SonarQube Scanner execution");
-    verify(logs).error("Caused by: NPE");
+    verify(logs, times(4)).error(anyString());
+    verify(logs).error("Error during SonarScanner execution");
+    verify(logs).error("my message");
+    verify(logs).error("Caused by: A functional cause");
+    verify(logs).error("");
   }
-  
+
   @Test
-  public void show_error_MessageException_debug() {
+  public void show_MessageException_stacktrace_in_debug() {
     Exception e = createException(true);
     testException(e, true, false, Exit.USER_ERROR);
 
-    verify(logs).error("Error during SonarQube Scanner execution");
-    verify(logs).error("my message");
-    verify(logs).error("Caused by: NPE");
+    verify(logs, times(1)).error(anyString(), any(Throwable.class));
+    verify(logs).error("Error during SonarScanner execution", e);
   }
 
   @Test
-  public void show_error_MessageException_debug_embedded() {
+  public void show_MessageException_stacktrace_in_debug_embedded() {
     Exception e = createException(true);
     testException(e, true, true, Exit.USER_ERROR);
 
-    verify(logs).error("Error during SonarQube Scanner execution");
-    verify(logs).error("my message");
-    verify(logs).error("Caused by: NPE");
+    verify(logs, times(1)).error(anyString(), any(Throwable.class));
+    verify(logs).error("Error during SonarScanner execution", e);
   }
 
   @Test
-  public void show_error_debug() {
+  public void show_stacktrace_in_debug() {
     Exception e = createException(false);
     testException(e, true, false, Exit.INTERNAL_ERROR);
 
-    verify(logs).error("Error during SonarQube Scanner execution", e);
-    verify(logs, never()).error("Re-run SonarQube Scanner using the -X switch to enable full debug logging.");
+    verify(logs).error("Error during SonarScanner execution", e);
+    verify(logs, never()).error("Re-run SonarScanner using the -X switch to enable full debug logging.");
   }
 
   private void testException(Exception e, boolean debugEnabled, boolean isEmbedded, int expectedExitCode) {
     when(cli.isDebugEnabled()).thenReturn(debugEnabled);
     when(cli.isEmbedded()).thenReturn(isEmbedded);
+    when(cli.getInvokedFrom()).thenReturn("");
 
     EmbeddedScanner runner = mock(EmbeddedScanner.class);
     doThrow(e).when(runner).execute(any());
-    when(scannerFactory.create(any(Properties.class))).thenReturn(runner);
+
+    when(scannerFactory.create(any(Properties.class), any(String.class))).thenReturn(runner);
 
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
     main.execute();
@@ -175,7 +194,7 @@ public class MainTest {
   private Exception createException(boolean messageException) {
     Exception e;
     if (messageException) {
-      e = new MessageException("my message", new NullPointerException("NPE"));
+      e = new MessageException("my message", new IllegalStateException("A functional cause"));
     } else {
       e = new IllegalStateException("Error", new NullPointerException("NPE"));
     }
@@ -187,6 +206,7 @@ public class MainTest {
   public void should_only_display_version() {
     Properties p = new Properties();
     when(cli.isDisplayVersionOnly()).thenReturn(true);
+    when(cli.getInvokedFrom()).thenReturn("");
     when(conf.properties()).thenReturn(p);
 
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
@@ -195,7 +215,7 @@ public class MainTest {
     InOrder inOrder = Mockito.inOrder(exit, scannerFactory);
 
     inOrder.verify(exit, times(1)).exit(Exit.SUCCESS);
-    inOrder.verify(scannerFactory, times(1)).create(p);
+    inOrder.verify(scannerFactory, times(1)).create(p, "");
     inOrder.verify(exit, times(1)).exit(Exit.SUCCESS);
   }
 
@@ -204,15 +224,16 @@ public class MainTest {
     Properties p = new Properties();
     p.setProperty(ScanProperties.SKIP, "true");
     when(conf.properties()).thenReturn(p);
+    when(cli.getInvokedFrom()).thenReturn("");
 
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
     main.execute();
 
-    verify(logs).info("SonarQube Scanner analysis skipped");
+    verify(logs).info("SonarScanner analysis skipped");
     InOrder inOrder = Mockito.inOrder(exit, scannerFactory);
 
     inOrder.verify(exit, times(1)).exit(Exit.SUCCESS);
-    inOrder.verify(scannerFactory, times(1)).create(p);
+    inOrder.verify(scannerFactory, times(1)).create(p, "");
     inOrder.verify(exit, times(1)).exit(Exit.SUCCESS);
   }
 
@@ -221,11 +242,24 @@ public class MainTest {
     when(scanner.serverVersion()).thenReturn("5.5");
     Properties p = new Properties();
     when(cli.isDisplayVersionOnly()).thenReturn(true);
+    when(cli.getInvokedFrom()).thenReturn("");
     when(conf.properties()).thenReturn(p);
 
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
     main.execute();
-    verify(logs).info("SonarQube server 5.5");
+    verify(logs).info("Analyzing on SonarQube server 5.5");
+  }
+
+  @Test
+  public void should_log_SonarCloud_server() {
+    Properties p = new Properties();
+    when(conf.properties()).thenReturn(p);
+    when(conf.isSonarCloud(null)).thenReturn(true);
+    when(cli.getInvokedFrom()).thenReturn("");
+
+    Main main = new Main(exit, cli, conf, scannerFactory, logs);
+    main.execute();
+    verify(logs).info("Analyzing on SonarCloud");
   }
 
   @Test
@@ -250,6 +284,7 @@ public class MainTest {
     Properties p = new Properties();
     p.put(propKey, propValue);
     when(conf.properties()).thenReturn(p);
+    when(cli.getInvokedFrom()).thenReturn("");
 
     Main main = new Main(exit, cli, conf, scannerFactory, logs);
     main.execute();

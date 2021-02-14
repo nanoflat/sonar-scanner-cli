@@ -1,6 +1,6 @@
 /*
- * SonarQube Scanner
- * Copyright (C) 2011-2019 SonarSource SA
+ * SonarScanner CLI
+ * Copyright (C) 2011-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -33,6 +33,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.sonarsource.scanner.api.internal.shaded.minimaljson.Json;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assume.assumeTrue;
@@ -47,11 +48,11 @@ public class ConfTest {
   @Rule
   public ExpectedException exception = ExpectedException.none();
 
-  private Map<String, String> env = new HashMap<>();
-  private Properties args = new Properties();
-  private Logs logs = new Logs(System.out, System.err);
-  private Cli cli = mock(Cli.class);
-  private Conf conf = new Conf(cli, logs, env);
+  private final Map<String, String> env = new HashMap<>();
+  private final Properties args = new Properties();
+  private final Logs logs = new Logs(System.out, System.err);
+  private final Cli cli = mock(Cli.class);
+  private final Conf conf = new Conf(cli, logs, env);
 
   @Before
   public void initConf() {
@@ -300,5 +301,74 @@ public class ConfTest {
     } finally {
       Files.delete(linkProjectHome);
     }
+  }
+
+  // SQSCANNER-24
+  @Test
+  public void should_load_project_settings_using_property() throws Exception {
+    Path home = Paths.get(getClass().getResource("ConfTest/shouldOverrideProjectSettingsPath/").toURI());
+    args.setProperty("project.home", home.toAbsolutePath().toString());
+
+    Properties properties = conf.properties();
+    assertThat(properties.get("sonar.prop")).isEqualTo("default");
+
+    args.setProperty("project.settings", home.resolve("conf/sq-project.properties").toAbsolutePath().toString());
+
+    properties = conf.properties();
+    assertThat(properties.get("sonar.prop")).isEqualTo("expected");
+  }
+
+  // SQSCANNER-61
+  @Test
+  public void should_load_project_settings_using_env() throws Exception {
+    Path home = Paths.get(getClass().getResource("ConfTest/shouldOverrideProjectSettingsPath/").toURI());
+    args.setProperty("project.home", home.toAbsolutePath().toString());
+
+    Properties properties = conf.properties();
+    assertThat(properties.get("sonar.prop")).isEqualTo("default");
+
+    String jsonString = Json.object()
+      .add("project.settings", home.resolve("conf/sq-project.properties").toAbsolutePath().toString())
+      .toString();
+
+    env.put("SONARQUBE_SCANNER_PARAMS", jsonString);
+
+    properties = conf.properties();
+    assertThat(properties.get("sonar.prop")).isEqualTo("expected");
+  }
+
+  // SQSCANNER-57
+  @Test
+  public void should_return_true_is_sonar_cloud() {
+
+    args.setProperty("sonar.host.url", "https://sonarcloud.io");
+
+    conf.properties();
+
+    assertThat(conf.isSonarCloud(null)).isTrue();
+  }
+
+  // SQSCANNER-57
+  @Test
+  public void should_return_false_is_sonar_cloud() {
+    args.setProperty("sonar.host.url", "https://mysonarqube.com:9000/");
+
+    //Still returns false, sonarcloud not detected in the content of the url
+    Properties properties = conf.properties();
+
+    assertThat(properties.getProperty("sonar.host.url")).isEqualTo("https://mysonarqube.com:9000/");
+
+    assertThat(conf.isSonarCloud(null)).isFalse();
+  }
+
+  // SQSCANNER-57
+  @Test
+  public void should_return_false_is_sonar_cloud_host_is_null() {
+
+    Properties emptyProperties = new Properties();
+
+    assertThat(emptyProperties.getProperty("sonar.host.url")).isNull();
+
+    assertThat(conf.isSonarCloud(emptyProperties)).isFalse();
   }
 }

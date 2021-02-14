@@ -1,6 +1,6 @@
 /*
- * SonarSource :: IT :: SonarQube Scanner
- * Copyright (C) 2009-2019 SonarSource SA
+ * SonarSource :: IT :: SonarScanner CLI
+ * Copyright (C) 2009-2021 SonarSource SA
  * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -24,22 +24,17 @@ import com.sonar.orchestrator.build.SonarScanner;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import org.junit.After;
 import org.junit.Test;
-import org.sonarqube.ws.WsMeasures.Measure;
+import org.sonarqube.ws.Measures.Measure;
 
 import static java.lang.Integer.parseInt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class DistributionTest extends ScannerTestCase {
 
-  @After
-  public void cleanup() {
-    orchestrator.resetData();
-  }
-
   @Test
-  public void should_succeed_with_self_contained_jre_despite_rubbish_java_home() throws IOException, InterruptedException {
+  public void should_succeed_with_self_contained_jre_despite_rubbish_java_home()
+    throws IOException, InterruptedException {
     String projectKey = "basedir-with-source";
 
     File projectDir = new File("projects/basedir-with-source");
@@ -48,13 +43,16 @@ public class DistributionTest extends ScannerTestCase {
       .useNative();
     orchestrator.executeBuild(build, true);
 
-    Map<String, Measure> projectMeasures = getMeasures(projectKey, "files", "ncloc");
+    Map<String, Measure> projectMeasures = getMeasures(projectKey, "files",
+      "ncloc");
     assertThat(parseInt(projectMeasures.get("files").getValue())).isEqualTo(1);
-    assertThat(parseInt(projectMeasures.get("ncloc").getValue())).isGreaterThan(1);
+    assertThat(parseInt(projectMeasures.get("ncloc").getValue()))
+      .isGreaterThan(1);
   }
 
   @Test(expected = BuildFailureException.class)
-  public void should_fail_without_self_contained_jre_when_rubbish_java_home() throws IOException, InterruptedException {
+  public void should_fail_without_self_contained_jre_when_rubbish_java_home()
+    throws IOException, InterruptedException {
     String projectKey = "basedir-with-source";
 
     File projectDir = new File("projects/basedir-with-source");
